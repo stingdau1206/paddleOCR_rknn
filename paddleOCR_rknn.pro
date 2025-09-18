@@ -1,6 +1,6 @@
 QT -= gui
 
-CONFIG += c++11 console
+CONFIG += c++17 console
 CONFIG -= app_bundle
 
 # The following define makes your compiler emit warnings if you use
@@ -17,7 +17,15 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp
 
+
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+INCLUDEPATH += \
+        $$[QT_SYSROOT]/usr/include/opencv4
+LIBS += -L$$[QT_SYSROOT]/usr/local/lib -lppocrv5_api
+LIBS += -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_videoio
+LIBS += -L$$[QT_SYSROOT]/usr/lib/aarch64-linux-gnu/blas -lblas
+LIBS += -L$$[QT_SYSROOT]/usr/lib/aarch64-linux-gnu/lapack -llapack

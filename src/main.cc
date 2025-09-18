@@ -1,17 +1,40 @@
-#include <QCoreApplication>
-#include "include/ppocrv5.h"
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+/*-------------------------------------------
+                Includes
+-------------------------------------------*/
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <opencv2/opencv.hpp>
+
+#include "ppocrv5.h"
+#include "easy_timer.h"
+
+#define INDENT "    "
 #define THRESHOLD 0.3                                       // pixel score threshold
 #define BOX_THRESHOLD 0.6                            // box score threshold
 #define USE_DILATION false                               // whether to do dilation, true or false
-#define DB_SCORE_MODE "fast"                        // slow or fast. slow for polygon mask; fast for rectangle mask
-#define DB_BOX_TYPE "quad"                                // poly or quad. poly for returning polygon box; quad for returning rectangle box
+#define DB_SCORE_MODE "slow"                        // slow or fast. slow for polygon mask; fast for rectangle mask
+#define DB_BOX_TYPE "poly"                                // poly or quad. poly for returning polygon box; quad for returning rectangle box
 #define DB_UNCLIP_RATIO 1.5                          // unclip ratio for poly type
 
-int main(int argc, char *argv[])
+/*-------------------------------------------
+                  Main Function
+-------------------------------------------*/
+int main(int argc, char** argv)
 {
-    QCoreApplication a(argc, argv);
-
     char* det_model_path = NULL;
     char* rec_model_path = NULL;
     char* image_path = NULL;
@@ -25,9 +48,9 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-
     int ret;
-    cv::Mat orig_img;
+    TIMER timer;
+    cv::Mat orig_img, image;
     ppocr_system_app_context rknn_app_ctx;
     memset(&rknn_app_ctx, 0, sizeof(ppocr_system_app_context));
 
@@ -51,6 +74,7 @@ int main(int argc, char *argv[])
     params.db_score_mode = DB_SCORE_MODE;
     params.db_box_type = DB_BOX_TYPE;
     params.db_unclip_ratio = DB_UNCLIP_RATIO;
+    const unsigned char blue[] = {0, 0, 255};
 
     // OpenCV读取图片
     image_buffer_t src_image;
@@ -66,23 +90,14 @@ int main(int argc, char *argv[])
     src_image.format = IMAGE_FORMAT_RGB888;
     src_image.virt_addr = (unsigned char*)orig_img.data;
 
-    for(int i = 0; i < 10; i++)
-    {
-    clock_t start;
-clock_t end;
-
-    start = clock();
+    timer.tik();
     ret = inference_ppocrv5_model(&rknn_app_ctx, &src_image, &params, &results);
-
-end = clock();
-    double time_taken = (double)(end - start) * 1000.0 / CLOCKS_PER_SEC;
-
-    printf("ret Time taken: %.3f ms\n", time_taken);
-}
     if (ret != 0) {
         printf("inference_ppocrv5_model fail! ret=%d\n", ret);
         goto out;
     }
+    timer.tok();
+    timer.print_time("inference_ppocrv5_model");
 
     // Draw Objects
     printf("DRAWING OBJECT\n");
@@ -93,18 +108,18 @@ end = clock();
         }
 
         printf("[%d] @ [(%d, %d), (%d, %d), (%d, %d), (%d, %d)]\n", i,
-               results.text_result[i].box.left_top.x, results.text_result[i].box.left_top.y,
-               results.text_result[i].box.right_top.x, results.text_result[i].box.right_top.y,
-               results.text_result[i].box.right_bottom.x, results.text_result[i].box.right_bottom.y,
-               results.text_result[i].box.left_bottom.x, results.text_result[i].box.left_bottom.y);
-
+            results.text_result[i].box.left_top.x, results.text_result[i].box.left_top.y, 
+            results.text_result[i].box.right_top.x, results.text_result[i].box.right_top.y, 
+            results.text_result[i].box.right_bottom.x, results.text_result[i].box.right_bottom.y, 
+            results.text_result[i].box.left_bottom.x, results.text_result[i].box.left_bottom.y);
+        
         // 顶点坐标
         std::vector<cv::Point> pts;
         pts.push_back(cv::Point(results.text_result[i].box.left_top.x, results.text_result[i].box.left_top.y));
         pts.push_back(cv::Point(results.text_result[i].box.right_top.x, results.text_result[i].box.right_top.y));
         pts.push_back(cv::Point(results.text_result[i].box.right_bottom.x, results.text_result[i].box.right_bottom.y));
         pts.push_back(cv::Point(results.text_result[i].box.left_bottom.x, results.text_result[i].box.left_bottom.y));
-
+ 
         // 绘制
         cv::polylines(orig_img, pts, true, cv::Scalar(255, 0, 0), 1, cv::LINE_4);
         printf("regconize result: %s, score=%f\n", results.text_result[i].text.str, results.text_result[i].text.score);
@@ -122,6 +137,6 @@ out:
     if (ret != 0) {
         printf("release_ppocr_model rec_context fail! ret=%d\n", ret);
     }
-
-    return a.exec();
+    return 0;
 }
+
